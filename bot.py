@@ -14,12 +14,20 @@ import time
 
 import nltk
 #nltk.download()
-from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from nltk.tokenize import sent_tokenize, word_tokenize, PunktSentenceTokenizer
+from nltk.corpus import wordnet
+
+ps = PorterStemmer()
+from nltk.corpus import stopwords, state_union
 #print(discord.__version__)  # check to make sure at least once you're on the right version!
 
 token = open("token.txt", "r").read()  # I've opted to just save my token to a text file. 
 
+train_text = state_union.raw("2005-GWBush.txt")
+sample_text = state_union.raw("2006-GWBush.txt")
+custom_sent_tokenizer = PunktSentenceTokenizer(train_text)
+tokenized = custom_sent_tokenizer.tokenize(sample_text)
 
 ### Whats the difference here?
 #client = discord.Client()  # starts the discord client.
@@ -60,21 +68,57 @@ async def on_message(message):
 
         await client.send_message(channel, 'hi there')
 
-    if len(message.content) > 50 and "Rotaka#6963" in str(message.author):
+
+    #Tokenizing, Stemming and Stopping in Sentences
+    if len(message.content) > 50 and len(message.content) < 500 and "Rotaka#6963" in str(message.author):
         EXAMPLE_TEXT = message.content
         stop_words = set(stopwords.words('english'))
         # for i in range(len(sent_tokenize(EXAMPLE_TEXT))):
         #     await client.send_message(channel, sent_tokenize(EXAMPLE_TEXT)[i])
         word_tokens = word_tokenize(EXAMPLE_TEXT)
 
-        filtered_sentence = []
+        # filtered_sentence = []
+
+        # for w in word_tokens:
+        #     if w not in stop_words:
+        #         filtered_sentence.append(w)
+
+        # await client.send_message(channel, word_tokens)
+        # await client.send_message(channel, filtered_sentence)
 
         for w in word_tokens:
-            if w not in stop_words:
-                filtered_sentence.append(w)
+            await client.send_message(channel, ps.stem(w))
 
-        await client.send_message(channel, word_tokens)
-        await client.send_message(channel, filtered_sentence)
+
+
+    #POS-Tagging
+    if len(message.content) > 500 and "Rotaka#6963" in str(message.author):
+        try:
+            for i in tokenized[:5]:
+                words = nltk.word_tokenize(i)
+                tagged = nltk.pos_tag(words)
+                # chunkGram = r"""Chunk: {<.*>+}
+                #                     }<VB.?|IN|DT|TO>+{"""
+                # chunkParser = nltk.RegexpParser(chunkGram)
+                # chunked = chunkParser.parse(tagged)
+                # # chunked.draw()  
+                # # await client.send_message(channel, tagged)
+                # for subtree in chunked.subtrees(filter=lambda t: t.label() == 'Chunk'):
+                #     print(subtree)
+                namedEnt = nltk.ne_chunk(tagged, binary=False)
+                namedEnt.draw()           
+
+        except Exception as e:
+            print(str(e))
+
+
+    #Synonyms, Antonyms
+    if "synonym" in message.content.lower() and "Rotaka#6963" in str(message.author):
+        await client.send_message(channel, "Please enter the word: ")
+        syn = await client.wait_for_message(author=message.author)
+        await client.send_message(message.channel, 'You want the synonyms of ' + syn.content + ' huh?')
+        await client.send_message(message.channel, 'Give me a moment')
+
 
 
 
