@@ -14,9 +14,10 @@ import time
 
 import nltk
 #nltk.download()
+import random
 from nltk.stem import PorterStemmer
 from nltk.tokenize import sent_tokenize, word_tokenize, PunktSentenceTokenizer
-from nltk.corpus import wordnet
+from nltk.corpus import wordnet, movie_reviews
 
 ps = PorterStemmer()
 from nltk.corpus import stopwords, state_union
@@ -36,8 +37,8 @@ client = commands.Bot(command_prefix = ".")
 #status = ['Msg1','Msg2','Msg3']
 
 
-#os.chdir(r'C:\Users\Robin\Desktop\Bot5\discord.py')
-os.chdir(r'C:\Users\TapperR\Desktop\Bot5\discord.py')
+os.chdir(r'C:\Users\Robin\Desktop\Bot6\bot')
+#os.chdir(r'C:\Users\TapperR\Desktop\Bot6\')
 
 
 #close the bot within server
@@ -106,7 +107,7 @@ async def on_message(message):
                 # for subtree in chunked.subtrees(filter=lambda t: t.label() == 'Chunk'):
                 #     print(subtree)
                 namedEnt = nltk.ne_chunk(tagged, binary=False)
-                namedEnt.draw()           
+                #namedEnt.draw()           
 
         except Exception as e:
             print(str(e))
@@ -115,14 +116,91 @@ async def on_message(message):
     #Synonyms, Antonyms
     if "synonym" in message.content.lower() and "Rotaka#6963" in str(message.author):
         await client.send_message(channel, "Please enter the word: ")
-        syn = await client.wait_for_message(author=message.author)
-        await client.send_message(message.channel, 'You want the synonyms of ' + syn.content + ' huh?')
+        word = await client.wait_for_message(author=message.author)
+        await client.send_message(message.channel, 'You want some synonyms of ' + word.content + ' huh? No problem...')
         await client.send_message(message.channel, 'Give me a moment')
 
+        synonyms = []
+        for syno in wordnet.synsets(word.content):
+            for l in syno.lemmas():
+                if l.name() != word.content:
+                    synonyms.append(l.name())
+        await client.send_message(message.channel, 'Ok my friend. Heres a list of synonyms:')
+        await client.send_message(message.channel, synonyms)
 
+
+    if "antonym" in message.content.lower() and "Rotaka#6963" in str(message.author):
+        await client.send_message(channel, "Please enter the word: ")
+        word = await client.wait_for_message(author=message.author)
+        await client.send_message(message.channel, 'You want some antonyms of ' + word.content + ' huh? No problem...')
+        await client.send_message(message.channel, 'Give me a moment')
+
+        antonyms = []
+        for anto in wordnet.synsets(word.content):
+            for l in anto.lemmas():
+                if l.name() != word.content and l.antonyms():
+                    antonyms.append(l.antonyms()[0].name())
+        await client.send_message(message.channel, 'Ok my friend. Heres a list of antonyms:')
+        await client.send_message(message.channel, antonyms)
+
+
+    if "definition" in message.content.lower() and "Rotaka#6963" in str(message.author):
+        await client.send_message(channel, "Please enter the word: ")
+        word = await client.wait_for_message(author=message.author)
+        await client.send_message(message.channel, 'You want the definition of ' + word.content + ' huh? No problem...')
+        await client.send_message(message.channel, 'Give me a moment')
+        await client.send_message(message.channel, wordnet.synsets(word.content)[0].definition())
+        await client.send_message(message.channel, "An example sentence would be:")
+        await client.send_message(message.channel, wordnet.synsets(word.content)[0].examples()[0])
 
 
     await client.process_commands(message)
+
+
+
+    #Textclassification for movie reviews
+    if "film" in message.content.lower() and "Rotaka#6963" in str(message.author):
+        documents = [(list(movie_reviews.words(fileid)), category) 
+        for category in movie_reviews.categories() 
+        for fileid in movie_reviews.fileids(category)]
+
+        random.shuffle(documents)
+        #await client.send_message(message.channel, documents[0][0][0:20])
+
+        all_words = []
+        for w in movie_reviews.words():
+            all_words.append(w.lower())
+
+        all_words = nltk.FreqDist(all_words)
+        word_features = list(all_words.keys())[:3000]
+
+        def find_features(document):
+            words = set(document)
+            features = {}
+            for w in word_features:
+                features[w] = (w in words)
+
+            return features
+
+        #list of tuples
+        featuresets = [(find_features(rev), category) for (rev, category) in documents]
+        #print(featuresets[2])
+
+        # set that we'll train our classifier with
+        training_set = featuresets[:1900]
+
+        # set that we'll test against.
+        testing_set = featuresets[1900:]
+
+        #define and train our classifier
+        classifier = nltk.NaiveBayesClassifier.train(training_set)
+
+        #test it
+        print("Classifier accuracy percent:",(nltk.classify.accuracy(classifier, testing_set))*100)
+
+
+        #what are the most suspicious words
+        classifier.show_most_informative_features(15)
 
 
 
@@ -134,7 +212,6 @@ async def echo(*args):
         output += word
         output += ' '
     await client.say(output)
-
 
 
 client.run(token) 
