@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 style.use("fivethirtyeight")
 
+import pickle
+
 import discord
 import json
 import os
@@ -37,8 +39,8 @@ client = commands.Bot(command_prefix = ".")
 #status = ['Msg1','Msg2','Msg3']
 
 
-os.chdir(r'C:\Users\Robin\Desktop\Bot6\bot')
-#os.chdir(r'C:\Users\TapperR\Desktop\Bot6\')
+#os.chdir(r'C:\Users\Robin\Desktop\Bot6\bot')
+os.chdir(r'C:\Users\Tapperr\Desktop\Bot6')
 
 
 #close the bot within server
@@ -51,6 +53,44 @@ async def x():
 async def on_ready():  # method expected by client. This runs once when connected
     await client.change_presence(game = discord.Game(name = 'Test'))    
     print(f'Bot is ready! We have logged in as {client.user}')  # notification of login.
+
+
+
+
+#list of tuples(list, category), create training/testing synsets
+documents = [(list(movie_reviews.words(fileid)), category) 
+for category in movie_reviews.categories() 
+for fileid in movie_reviews.fileids(category)]
+
+random.shuffle(documents)
+#await client.send_message(message.channel, documents[0][0][0:20])
+
+all_words = []
+for w in movie_reviews.words():
+    all_words.append(w.lower())
+
+all_words = nltk.FreqDist(all_words)
+word_features = list(all_words.keys())[:3000]
+
+def find_features(document):
+    words = set(document)
+    features = {}
+    for w in word_features:
+        features[w] = (w in words)
+
+    return features
+
+#list of tuples
+featuresets = [(find_features(rev), category) for (rev, category) in documents]
+#print(featuresets[2])
+
+# set that we'll train our classifier with
+training_set = featuresets[:1900]
+
+# set that we'll test against.
+testing_set = featuresets[1900:]
+
+
 
 @client.event
 async def on_message(message):
@@ -154,46 +194,20 @@ async def on_message(message):
         await client.send_message(message.channel, wordnet.synsets(word.content)[0].examples()[0])
 
 
-    await client.process_commands(message)
+
+
 
 
 
     #Textclassification for movie reviews
-    if "film" in message.content.lower() and "Rotaka#6963" in str(message.author):
-        documents = [(list(movie_reviews.words(fileid)), category) 
-        for category in movie_reviews.categories() 
-        for fileid in movie_reviews.fileids(category)]
+    if "train_nb" in message.content.lower() and "Rotaka#6963" in str(message.author):
 
-        random.shuffle(documents)
-        #await client.send_message(message.channel, documents[0][0][0:20])
-
-        all_words = []
-        for w in movie_reviews.words():
-            all_words.append(w.lower())
-
-        all_words = nltk.FreqDist(all_words)
-        word_features = list(all_words.keys())[:3000]
-
-        def find_features(document):
-            words = set(document)
-            features = {}
-            for w in word_features:
-                features[w] = (w in words)
-
-            return features
-
-        #list of tuples
-        featuresets = [(find_features(rev), category) for (rev, category) in documents]
-        #print(featuresets[2])
-
-        # set that we'll train our classifier with
-        training_set = featuresets[:1900]
-
-        # set that we'll test against.
-        testing_set = featuresets[1900:]
 
         #define and train our classifier
         classifier = nltk.NaiveBayesClassifier.train(training_set)
+        save_classifier = open("naivebayes.pickle","wb")
+        pickle.dump(classifier, save_classifier)
+        save_classifier.close()
 
         #test it
         print("Classifier accuracy percent:",(nltk.classify.accuracy(classifier, testing_set))*100)
@@ -203,8 +217,22 @@ async def on_message(message):
         classifier.show_most_informative_features(15)
 
 
+        
 
-#### COMMANDS ####
+    #is there any classifer saved in the directory already
+    if "pick_nb" in message.content.lower() and "Rotaka#6963" in str(message.author):
+        print("NaiveBayesClassifier will be applied...")
+        classifier_f = open("naivebayes.pickle", "rb")
+        classifier = pickle.load(classifier_f)
+        classifier_f.close()
+        print("Classifier accuracy percent:",(nltk.classify.accuracy(classifier, testing_set))*100)
+        #what are the most suspicious words
+        classifier.show_most_informative_features(15)
+
+    await client.process_commands(message)
+
+
+### COMMANDS ####
 @client.command()
 async def echo(*args):
     output = ''
@@ -212,6 +240,38 @@ async def echo(*args):
         output += word
         output += ' '
     await client.say(output)
+
+@client.command()
+async def semantix(*args):
+    sent = []
+    for word in args:
+        sent.append(word)
+
+    #print(sent)
+
+    # def find_features(document):
+    # words = set(document)
+    # features = {}
+    # for w in word_features:
+    #     features[w] = (w in words)
+
+    # return features
+
+    #list of tuples
+    featureset1 = [(find_features(sent))]
+    #print(featureset1)
+
+    #print("NaiveBayesClassifier will be applied...")
+    classifier_f = open("naivebayes.pickle", "rb")
+    classifier = pickle.load(classifier_f)
+    classifier_f.close()
+    output = classifier.classify(featureset1[0])
+    print("Your sentence was: ",output)
+
+    if output == 'neg':
+        await client.say("Your sentence was negative")
+    else:
+        await client.say("Your sentence was positive")
 
 
 client.run(token) 
